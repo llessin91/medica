@@ -39,6 +39,8 @@ O repositório e os projetos do GitHub, Vercel e Supabase não são vinculados a
 
 ## Verificações
 
-`npm run check:foundation` realiza verificações estáticas básicas do esqueleto e da migração. Isso **não substitui** uma execução real de teste RLS com duas contas Supabase distintas, nem auditoria de segurança ou teste de implantação.
+`npm run check:foundation` realiza verificações estáticas do esqueleto, da migração, do isolamento RLS esperado e da tipagem de `cookiesToSet` no middleware e no cliente servidor. Isso **não substitui** uma execução real de teste RLS com duas contas Supabase distintas, auditoria de segurança ou teste de implantação.
+
+A correção de compilação tipa `cookiesToSet` explicitamente com `CookieOptions`, exportado por `@supabase/ssr` na versão 0.6.1 usada pelo projeto. A checagem estática passou. O build de produção não pôde ser confirmado neste ambiente porque a instalação das dependências foi interrompida por uma limitação do sistema de arquivos (`ENOSYS` ao renomear um pacote); após baixar o projeto, execute `npm ci` e `npm run build` ou confira o novo deploy na Vercel.
 
 Veja `docs/06-configuracao-do-ambiente.md`, `docs/07-github-vercel-supabase.md` e `docs/05-seguranca-e-rls.md`.

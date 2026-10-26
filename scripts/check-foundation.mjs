@@ -5,6 +5,7 @@ const root = new URL('../', import.meta.url);
 const read = (relative) => readFileSync(new URL(relative, root), 'utf8');
 const migration = read('supabase/migrations/20261026000100_create_patients.sql');
 const middleware = read('middleware.ts');
+const serverClient = read('src/lib/supabase/server.ts');
 const dashboard = read('src/app/dashboard/page.tsx');
 const envExample = read('.env.example');
 
@@ -16,6 +17,10 @@ assert.equal((migration.match(/owner_user_id = \(select auth\.uid\(\)\)/g) ?? []
 assert.doesNotMatch(migration, /for delete to authenticated/i, 'Exclusão definitiva ainda não deve estar habilitada.');
 assert.match(migration, /enable row level security/i);
 assert.match(middleware, /auth\.getUser\(\)/);
+for (const source of [middleware, serverClient]) {
+  assert.match(source, /type CookieOptions/);
+  assert.match(source, /cookiesToSet:\s*\{\s*name:\s*string;\s*value:\s*string;\s*options:\s*CookieOptions\s*\}\[\]/);
+}
 assert.match(dashboard, /auth\.getUser\(\)/);
 assert.doesNotMatch(envExample, /service_role|secret/i);
 assert.ok(existsSync(new URL('docs/05-seguranca-e-rls.md', root)), 'Documentação de segurança ausente');
