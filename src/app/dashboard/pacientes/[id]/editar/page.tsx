@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { updatePatient } from '@/app/pacientes/actions';
 import { PatientForm } from '@/app/pacientes/PatientForm';
+import type { Patient } from '@/app/pacientes/types';
 import { createClient } from '@/lib/supabase/server';
 
 type PageProps = { params: Promise<{ id: string }>; searchParams: Promise<{ status?: string }> };
@@ -13,8 +14,9 @@ export default async function EditPatientPage({ params, searchParams }: PageProp
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) redirect('/login');
-  const { data: patient, error } = await supabase.from('patients').select('id, display_name, birth_date, color, notes, archived_at').eq('id', id).maybeSingle();
-  if (error || !patient) notFound();
+  const { data, error } = await supabase.from('patients').select('id, display_name, birth_date, color, notes, archived_at').eq('id', id).maybeSingle();
+  if (error || !data) notFound();
+  const patient: Patient = data;
   if (patient.archived_at) redirect('/dashboard/pacientes?status=archived');
 
   return (
