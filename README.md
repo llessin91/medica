@@ -1,12 +1,12 @@
 # Controle Pessoal de Medicamentos
 
-Base técnica aprovada para uma aplicação pessoal de organização. A V1 destina-se a uma única conta administradora. Pacientes não têm login. O sistema não fornece recomendações clínicas nem orienta alterações de tratamento.
+Aplicação privada de organização pessoal. A V1 destina-se a uma única conta administradora; pacientes não têm login. O sistema não fornece recomendações clínicas nem orienta alterações de tratamento.
 
 ## Situação desta entrega
 
-Inclui o esqueleto da aplicação Next.js, tela de login por Supabase Auth, área protegida, uma migração inicial da tabela de pacientes com RLS e documentação de configuração. Não inclui cadastro/edição de pacientes, medicamentos, estoque, receitas, calendário funcional, alertas externos ou PWA.
+Inclui Next.js, TypeScript, login Supabase Auth, área protegida, cadastro/listagem/edição/arquivamento e restauração de pacientes, migração da tabela com RLS e documentação de configuração. A interface não oferece exclusão definitiva. Medicamentos, estoque, compras, receitas, calendário funcional e alertas externos continuam fora desta etapa.
 
-A conexão com GitHub, Vercel e Supabase, os segredos e a execução da migração precisam ser configurados pelo proprietário nas respectivas contas. Nenhuma credencial foi incluída.
+A conexão com GitHub, Vercel e Supabase, os segredos e a execução da migração são geridos pelo proprietário nas respetivas contas. Nenhuma credencial foi incluída.
 
 ## Pré-requisitos
 
@@ -22,25 +22,26 @@ A conexão com GitHub, Vercel e Supabase, os segredos e a execução da migraç�
 4. Aplique `supabase/migrations/20261026000100_create_patients.sql` ao projeto Supabase usando o fluxo de migrações escolhido e conferido na documentação oficial.
 5. Execute `npm run dev` e abra o endereço local informado pelo Next.js.
 
-Sem as variáveis e um projeto Supabase configurado, login e área protegida não podem ser testados de ponta a ponta.
+Sem as variáveis e um projeto Supabase configurado, login e dados persistidos não podem ser testados de ponta a ponta.
 
 ## Segurança essencial
 
 - RLS da tabela `patients` limita operações a `owner_user_id = auth.uid()`.
-- A tela protegida valida o usuário no servidor; o middleware atualiza a sessão e protege a navegação.
-- A segurança do banco não depende somente do middleware.
+- As páginas protegidas validam o usuário no servidor; o middleware atualiza a sessão e protege a navegação.
+- As ações de pacientes validam o usuário antes de alterar dados, atribuem a propriedade no servidor, e não oferecem exclusão definitiva.
+- A segurança do banco não depende somente do middleware nem dos filtros da interface.
 - Restrinja a criação de usuários administradores; não habilite cadastro público para a V1.
 - Configure URLs de callback e domínios confiáveis conforme a documentação atual do Supabase e da Vercel.
 - Nunca envie credenciais, tokens, dados reais de saúde ou arquivos `.env*` para o GitHub.
 
 ## Implantação
 
-O repositório e os projetos do GitHub, Vercel e Supabase não são vinculados automaticamente por este scaffold. Crie e vincule as contas manualmente; configure as mesmas variáveis apenas no ambiente necessário e aplique migrações após revisão. Confirme limites, backups, retenção e custos diretamente nas condições atuais dos serviços antes de inserir dados reais.
+O repositório e os projetos do GitHub, Vercel e Supabase não são vinculados automaticamente por esta aplicação. Crie e vincule as contas manualmente; configure as mesmas variáveis apenas no ambiente necessário e aplique migrações após revisão. Confirme limites, backups, retenção e custos diretamente nas condições atuais dos serviços antes de inserir dados reais.
 
 ## Verificações
 
-`npm run check:foundation` realiza verificações estáticas do esqueleto, da migração, do isolamento RLS esperado e da tipagem de `cookiesToSet` no middleware e no cliente servidor. Isso **não substitui** uma execução real de teste RLS com duas contas Supabase distintas, auditoria de segurança ou teste de implantação.
+Execute `npm run check` para as verificações estáticas da fundação e do módulo de pacientes; `npm run build` verifica a compilação. As verificações estáticas confirmam estruturas e regras selecionadas, mas não substituem o teste real das políticas RLS com contas Supabase distintas, uma auditoria de segurança ou o teste de implantação.
 
-A correção de compilação tipa `cookiesToSet` explicitamente com `CookieOptions`, exportado por `@supabase/ssr` na versão 0.6.1 usada pelo projeto. A checagem estática passou. O build de produção não pôde ser confirmado neste ambiente porque a instalação das dependências foi interrompida por uma limitação do sistema de arquivos (`ENOSYS` ao renomear um pacote); após baixar o projeto, execute `npm ci` e `npm run build` ou confira o novo deploy na Vercel.
+A correção de compilação tipa `cookiesToSet` explicitamente com `CookieOptions`, exportado por `@supabase/ssr` na versão 0.6.1 usada pelo projeto. Em ambiente anterior, a instalação das dependências foi interrompida por uma limitação do sistema de arquivos (`ENOSYS` ao renomear um pacote), e o build de produção ficou pendente de confirmação. Após baixar esta entrega, execute `npm ci` e `npm run build` ou confira o deploy na Vercel antes de inserir dados reais.
 
-Veja `docs/06-configuracao-do-ambiente.md`, `docs/07-github-vercel-supabase.md` e `docs/05-seguranca-e-rls.md`.
+Veja `docs/06-configuracao-do-ambiente.md`, `docs/07-github-vercel-supabase.md`, `docs/08-pacientes-e-permissoes.md` e `docs/14-manual-de-uso.md`.
