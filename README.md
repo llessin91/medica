@@ -1,47 +1,61 @@
-# Controle Pessoal de Medicamentos
+# Minha Farmácia — controle pessoal de medicamentos
 
-Aplicação privada de organização pessoal. A V1 destina-se a uma única conta administradora; pacientes não têm login. O sistema não fornece recomendações clínicas nem orienta alterações de tratamento.
+Aplicativo web responsivo para organizar medicamentos, estimar o saldo pelo consumo diário, registrar reposições e definir limites para receita e estoque baixo. O cálculo é **uma previsão organizacional**, não confirma a tomada de doses nem substitui orientação profissional.
 
-## Situação desta entrega
+## Testar
 
-Inclui Next.js, TypeScript, login Supabase Auth, área protegida, cadastro/listagem/edição/arquivamento e restauração de pacientes, migração da tabela com RLS e documentação de configuração. A interface não oferece exclusão definitiva. Medicamentos, estoque, compras, receitas, calendário funcional e alertas externos continuam fora desta etapa.
+Abra `index.html` no navegador ou publique o projeto como site estático. Para sincronizar em vários dispositivos, configure um projeto Supabase conforme abaixo. Sem Supabase, os dados ficam somente no armazenamento local deste navegador. A primeira abertura inicia sem cadastros e mostra uma tela para adicionar o primeiro medicamento.
 
-A conexão com GitHub, Vercel e Supabase, os segredos e a execução da migração são geridos pelo proprietário nas respetivas contas. Nenhuma credencial foi incluída.
+## Configurar o Supabase
 
-## Pré-requisitos
+A URL e a chave `anon/public` informadas já estão aplicadas em `config.js`. Essa chave foi feita para uso no navegador; a proteção dos dados depende de RLS e nunca substitui as políticas de acesso.
 
-- Node.js 22 ou versão compatível com Next.js 15.
-- Projeto Supabase criado e acessível.
-- Conta administradora criada no Supabase Auth de forma privada; o aplicativo não oferece cadastro público.
+1. No SQL Editor do projeto informado, execute o conteúdo atualizado de `supabase/schema.sql`. Ele cria/atualiza as tabelas de medicamentos, compras e lembretes pendentes com RLS.
+2. Publique o site e abra **Configurações → Conectar Supabase** para criar sua conta ou entrar. Pode ser preciso confirmar seu e-mail.
+3. Autorize o domínio publicado na configuração de autenticação do Supabase.
+4. Para desenvolvimento local, use a configuração já preenchida, mas não acrescente chaves `service_role` nem outros segredos ao site.
 
-## Executar localmente
+> A primeira sessão pode sincronizar os medicamentos e compras já salvos localmente. Revise os dados depois do login.
 
-1. Copie `.env.example` para `.env.local`.
-2. Preencha `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` com os valores públicos do seu projeto Supabase. A chave anon/public foi concebida para uso no cliente, mas só é segura em conjunto com RLS correto. Nunca coloque `service_role` ou outro segredo em variável `NEXT_PUBLIC_*`.
-3. Instale as dependências com `npm install`.
-4. Aplique `supabase/migrations/20261026000100_create_patients.sql` ao projeto Supabase usando o fluxo de migrações escolhido e conferido na documentação oficial.
-5. Execute `npm run dev` e abra o endereço local informado pelo Next.js.
+## Telegram (configuração única no Supabase)
 
-Sem as variáveis e um projeto Supabase configurado, login e dados persistidos não podem ser testados de ponta a ponta.
+O token do bot e o chat ID permanecem somente nos secrets do servidor — nunca no navegador, GitHub ou Vercel. A função está em `supabase/functions/telegram-reminders/index.ts`.
 
-## Segurança essencial
+1. No Telegram, crie um bot com `@BotFather`, abra a conversa com ele e envie `/start`. Obtenha seu chat ID (por exemplo, com `@userinfobot`).
+2. Faça deploy da função `telegram-reminders` no projeto Supabase.
+3. Cadastre `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_OWNER_USER_ID` (UUID do usuário Supabase que receberá os avisos) e `CRON_SECRET` nos secrets da Edge Function. O identificador do dono evita que dados de outras contas sejam enviados ao chat pessoal.
+4. No app, entre na sua conta e use **Configurações → Configurar Telegram → Testar envio**. O teste é autenticado e só envia uma mensagem fixa de verificação.
+5. Publique novamente a Edge Function `telegram-reminders` e configure Supabase Cron para chamá-la via POST com `x-cron-secret` igual ao `CRON_SECRET`, uma vez por dia no horário desejado. O Cron usa UTC; 9h de Brasília corresponde a `0 12 * * *`.
 
-- RLS da tabela `patients` limita operações a `owner_user_id = auth.uid()`.
-- As páginas protegidas validam o usuário no servidor; o middleware atualiza a sessão e protege a navegação.
-- As ações de pacientes validam o usuário antes de alterar dados, atribuem a propriedade no servidor, e não oferecem exclusão definitiva.
-- A segurança do banco não depende somente do middleware nem dos filtros da interface.
-- Restrinja a criação de usuários administradores; não habilite cadastro público para a V1.
-- Configure URLs de callback e domínios confiáveis conforme a documentação atual do Supabase e da Vercel.
-- Nunca envie credenciais, tokens, dados reais de saúde ou arquivos `.env*` para o GitHub.
+O teste manual usa a sessão autenticada; o job de lembretes exige o segredo do Cron e o UUID configurado em `TELEGRAM_OWNER_USER_ID`. Cada pendência tem estado independente e é reenviada no máximo uma vez por dia enquanto estiver aberta. A chave `SUPABASE_SERVICE_ROLE_KEY` só pode ser usada no ambiente seguro da função.
 
-## Implantação
+## Publicar no GitHub e Vercel
 
-O repositório e os projetos do GitHub, Vercel e Supabase não são vinculados automaticamente por esta aplicação. Crie e vincule as contas manualmente; configure as mesmas variáveis apenas no ambiente necessário e aplique migrações após revisão. Confirme limites, backups, retenção e custos diretamente nas condições atuais dos serviços antes de inserir dados reais.
+1. Crie um repositório GitHub **privado**, pois o app pode guardar informação relacionada à saúde.
+2. Envie os arquivos do projeto. Nunca adicione o token Telegram ou a chave `service_role` ao repositório.
+3. Importe o repositório privado na Vercel. O site estático não exige etapa de build.
+4. Configure o domínio da publicação na autenticação do Supabase.
 
-## Verificações
+## Publicar no GitHub e Vercel
 
-Execute `npm run check` para as verificações estáticas da fundação e do módulo de pacientes; `npm run build` verifica a compilação. As verificações estáticas confirmam estruturas e regras selecionadas, mas não substituem o teste real das políticas RLS com contas Supabase distintas, uma auditoria de segurança ou o teste de implantação.
+1. Crie um repositório GitHub **privado**, pois este aplicativo pode guardar informação relacionada à saúde.
+2. Envie o conteúdo desta pasta. Não adicione credenciais, `config.js` configurado, token Telegram ou chave `service_role` ao repositório.
+3. Importe o repositório privado na Vercel. A configuração incluída publica a página estática; não é necessário build.
+4. Depois da primeira publicação, configure o domínio autorizado de autenticação no painel Supabase.
 
-A correção de compilação tipa `cookiesToSet` explicitamente com `CookieOptions`, exportado por `@supabase/ssr` na versão 0.6.1 usada pelo projeto. Em ambiente anterior, a instalação das dependências foi interrompida por uma limitação do sistema de arquivos (`ENOSYS` ao renomear um pacote), e o build de produção ficou pendente de confirmação. Após baixar esta entrega, execute `npm ci` e `npm run build` ou confira o deploy na Vercel antes de inserir dados reais.
+## Funcionalidades desta versão
 
-Veja `docs/06-configuracao-do-ambiente.md`, `docs/07-github-vercel-supabase.md`, `docs/08-pacientes-e-permissoes.md` e `docs/14-manual-de-uso.md`.
+- Cadastro, edição e remoção de medicamentos; clicar no nome na visão geral ou na lista abre a edição.
+- Opção individual para indicar se o medicamento precisa de receita; somente itens marcados recebem alertas de renovação.
+- Quantidade/unidade, consumo diário e data-base; desconto de estoque por tempo decorrido, pausa e limites personalizados para receita/estoque baixo.
+- Registro de compras: data, quantidade, valor e observação; soma ao saldo e mostra histórico.
+- Visão geral, filtros, responsividade, exportação e remoção dos dados locais.
+- Login Supabase, dados privados com RLS e sincronização entre dispositivos após executar o schema.
+- Teste autenticado de entrega Telegram; pendências separadas para pedir receita e comprar; compra confirmada atualiza o estoque e o histórico.
+- Reenvio diário no Telegram até confirmação no app, com controle de envio por pendência e proteção de destinatário via `TELEGRAM_OWNER_USER_ID`.
+
+## Observações
+
+- A sincronização Supabase é habilitada após preencher a configuração e entrar com uma conta. Execute o SQL atualizado antes de abrir a nova área de lembretes.
+- Alertas dentro do app são calculados ao abrir/atualizar a página; alertas Telegram exigem agendamento no servidor para chegar mesmo quando o site estiver fechado.
+- O usuário confirma quantidades e consumo com as orientações recebidas do profissional de saúde.
