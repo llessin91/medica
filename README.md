@@ -4,14 +4,14 @@ Aplicativo web responsivo para organizar medicamentos, estimar o saldo pelo cons
 
 ## Testar
 
-Abra `index.html` no navegador ou publique o projeto como site estático. Para sincronizar em vários dispositivos, configure um projeto Supabase conforme abaixo. Sem Supabase, os dados ficam somente no armazenamento local deste navegador. A primeira abertura inicia sem cadastros e mostra uma tela para adicionar o primeiro medicamento.
+Abra `index.html` no navegador ou publique o projeto como site estático. O app exige uma conta para entrar; sem sessão, qualquer acesso direto mostra a tela de login. Para sincronizar em vários dispositivos, configure o projeto Supabase conforme abaixo.
 
 ## Configurar o Supabase
 
 A URL e a chave `anon/public` informadas já estão aplicadas em `config.js`. Essa chave foi feita para uso no navegador; a proteção dos dados depende de RLS e nunca substitui as políticas de acesso.
 
-1. No SQL Editor do projeto informado, execute o conteúdo atualizado de `supabase/schema.sql`. Ele cria/atualiza as tabelas de medicamentos, compras e lembretes pendentes com RLS.
-2. Publique o site e abra **Configurações → Conectar Supabase** para criar sua conta ou entrar. Pode ser preciso confirmar seu e-mail.
+1. No SQL Editor do projeto informado, execute o conteúdo atualizado de `supabase/schema.sql`. Ele cria/atualiza as tabelas de medicamentos, compras, listas por pessoa e lembretes pendentes com RLS. Cadastros existentes recebem a lista padrão “Minha lista”.
+2. Publique o site e use a tela inicial para entrar, criar uma conta com nome completo, recuperar senha ou continuar com Google. A opção “Manter conectado neste dispositivo” controla a duração da sessão.
 3. Autorize o domínio publicado na configuração de autenticação do Supabase.
 4. Para desenvolvimento local, use a configuração já preenchida, mas não acrescente chaves `service_role` nem outros segredos ao site.
 
@@ -19,15 +19,25 @@ A URL e a chave `anon/public` informadas já estão aplicadas em `config.js`. Es
 
 ## Telegram (configuração única no Supabase)
 
-O token do bot e o chat ID permanecem somente nos secrets do servidor — nunca no navegador, GitHub ou Vercel. A função está em `supabase/functions/telegram-reminders/index.ts`.
+O token do bot, o chat ID e os segredos ficam somente no servidor ou em um terminal privado — nunca no navegador, repositório público ou chat. A função `supabase/functions/telegram-reminders/index.ts` recebe o Cron e as respostas dos botões.
 
-1. No Telegram, crie um bot com `@BotFather`, abra a conversa com ele e envie `/start`. Obtenha seu chat ID (por exemplo, com `@userinfobot`).
-2. Faça deploy da função `telegram-reminders` no projeto Supabase.
-3. Cadastre `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_OWNER_USER_ID` (UUID do usuário Supabase que receberá os avisos) e `CRON_SECRET` nos secrets da Edge Function. O identificador do dono evita que dados de outras contas sejam enviados ao chat pessoal.
-4. No app, entre na sua conta e use **Configurações → Configurar Telegram → Testar envio**. O teste é autenticado e só envia uma mensagem fixa de verificação.
-5. Publique novamente a Edge Function `telegram-reminders` e configure Supabase Cron para chamá-la via POST com `x-cron-secret` igual ao `CRON_SECRET`, uma vez por dia no horário desejado. O Cron usa UTC; 9h de Brasília corresponde a `0 12 * * *`.
+1. No SQL Editor do Supabase, execute o `supabase/schema.sql` atualizado. Ele faz a migração dos lembretes para suas listas e cria o estado temporário da pergunta de quantidade e a rotina transacional de registro de compra.
+2. No Telegram, crie/abra o bot com `@BotFather`, envie `/start` na conversa privada e obtenha o chat ID. Os botões são restritos ao chat privado configurado.
+3. Cadastre `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_OWNER_USER_ID` (UUID da conta Supabase), `CRON_SECRET` e `TELEGRAM_WEBHOOK_SECRET` nos secrets da Edge Function. Use um segredo webhook aleatório com 1–256 caracteres, somente letras, números, `_` ou `-`.
+4. A configuração `supabase/config.toml` desativa a validação JWT automática somente para esta função; as três rotas continuam validadas no código (webhook por secret token, Cron por `CRON_SECRET` e teste pelo login Supabase). Publique a função a partir da raiz deste projeto com `npx supabase functions deploy telegram-reminders --use-api --project-ref nzfjrqhhxbpjjuusvzja`. Configure o webhook do Telegram para `https://nzfjrqhhxbpjjuusvzja.supabase.co/functions/v1/telegram-reminders`, enviando o mesmo `TELEGRAM_WEBHOOK_SECRET` no campo `secret_token` do método `setWebhook`. O Telegram deve encaminhar `callback_query` e `message`; não configure outra função como webhook do mesmo bot.
+5. Para registrar o webhook em um terminal privado, defina localmente `TELEGRAM_BOT_TOKEN` e `TELEGRAM_WEBHOOK_SECRET` e execute:
 
-O teste manual usa a sessão autenticada; o job de lembretes exige o segredo do Cron e o UUID configurado em `TELEGRAM_OWNER_USER_ID`. Cada pendência tem estado independente e é reenviada no máximo uma vez por dia enquanto estiver aberta. A chave `SUPABASE_SERVICE_ROLE_KEY` só pode ser usada no ambiente seguro da função.
+   ```sh
+   curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
+     --data-urlencode "url=https://nzfjrqhhxbpjjuusvzja.supabase.co/functions/v1/telegram-reminders" \
+     --data-urlencode "secret_token=${TELEGRAM_WEBHOOK_SECRET}"
+   ```
+
+   Não cole o token em um site, repositório, chamado de suporte ou chat.
+6. Configure o Supabase Cron para chamar a função via POST com `x-cron-secret` igual a `CRON_SECRET`, uma vez por dia no horário desejado. O Cron usa UTC; 9h de Brasília corresponde a `0 12 * * *`.
+7. No app atualizado, entre na conta e use **Configurações → Configurar Telegram → Testar envio** para validar a entrega.
+
+Ao tocar **Confirmado** no lembrete de receita, o estado passa a concluído. Em **Aguardar**, o envio fica adiado até o próximo horário do Cron. Em **Confirmar compra**, o bot pergunta a quantidade; uma resposta numérica atualiza o estoque e o histórico no Supabase em uma única transação e encerra o lembrete. A quantidade expira após 24 horas se não houver resposta. A chave `SUPABASE_SERVICE_ROLE_KEY` só pode ser usada no ambiente seguro da função.
 
 ## Publicar no GitHub e Vercel
 
@@ -50,9 +60,10 @@ O teste manual usa a sessão autenticada; o job de lembretes exige o segredo do 
 - Quantidade/unidade, consumo diário e data-base; desconto de estoque por tempo decorrido, pausa e limites personalizados para receita/estoque baixo.
 - Registro de compras: data, quantidade, valor e observação; soma ao saldo e mostra histórico.
 - Visão geral, filtros, responsividade, exportação e remoção dos dados locais.
-- Login Supabase, dados privados com RLS e sincronização entre dispositivos após executar o schema.
-- Teste autenticado de entrega Telegram; pendências separadas para pedir receita e comprar; compra confirmada atualiza o estoque e o histórico.
-- Reenvio diário no Telegram até confirmação no app, com controle de envio por pendência e proteção de destinatário via `TELEGRAM_OWNER_USER_ID`.
+- Login obrigatório por e-mail/senha ou Google, cadastro com nome, recuperação de senha e sessão opcionalmente persistente.
+- Listas nomeadas por pessoa com troca, criação, renomeação e arquivamento na barra superior; cada lista mantém dados separados.
+- Telegram com botões Confirmado/Aguardar para receita e Confirmar compra/Aguardar para reposição; a quantidade é perguntada no chat e salva no histórico e no estoque.
+- Reenvio no horário diário programado; confirmação no app ou no Telegram encerra o lembrete e sincroniza seu estado com a lista correta.
 
 ## Observações
 
