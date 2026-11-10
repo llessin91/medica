@@ -169,9 +169,12 @@ Deno.serve(async (req) => {
         const m = Array.isArray(r.medication) ? r.medication[0] : r.medication;
         const list = Array.isArray(m?.list) ? m.list[0] : m?.list;
         const prefix = list?.name ? `[${list.name}] ` : "";
-        const text = r.kind === "prescription"
-          ? `📄 ${prefix}Pedir/renovar a receita de ${m?.name || "medicamento"}.\n\nToque em Confirmado quando resolver, ou em Aguardar para receber novamente no próximo horário programado.`
-          : `🛒 ${prefix}Comprar ${m?.name || "medicamento"} — estoque estimado: ${Math.floor(medicationStatus(m || {}).remaining)} ${m?.unit || "unidades"}.\n\nToque em Confirmar compra para informar a quantidade e atualizar o estoque, ou em Aguardar para receber novamente no próximo horário programado.`;
+        const remaining = medicationStatus(m || {}).remaining;
+const text = r.kind === "prescription"
+  ? `📄 ${prefix}Pedir/renovar a receita de ${m?.name || "medicamento"}.\n\nToque em Confirmado quando resolver, ou em Aguardar para receber novamente no próximo horário programado.`
+  : remaining <= 0
+    ? `🛒 ${prefix}O estoque de ${m?.name || "medicamento"} acabou.\n\nToque em Confirmar compra para informar a quantidade e atualizar o estoque, ou em Aguardar para receber novamente no próximo horário programado.`
+    : `🛒 ${prefix}Comprar ${m?.name || "medicamento"} — estoque estimado: ${Math.floor(remaining)} ${m?.unit || "unidades"}.\n\nToque em Confirmar compra para informar a quantidade e atualizar o estoque, ou em Aguardar para receber novamente no próximo horário programado.`;
         await sendTelegram(telegramToken, expectedChatId, text, keyboard(r.kind, r.id));
         const { error } = await db.from("medication_reminders").update({ last_notified_at: new Date().toISOString() }).eq("id", r.id).eq("status", "pending");
         if (error) return json({ error: error.message }, 500);
