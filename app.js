@@ -17,7 +17,13 @@ function daysText(n){if(!Number.isFinite(n))return 'Sem previsão';if(n<=0)retur
 function needsPrescription(m){return m.needsPrescription===true}
 function hasPrescriptionAlert(m){return needsPrescription(m)&&getDays(m)<=Number(m.prescriptionDays||0)}
 function needsAttention(m){return getDays(m)<=Number(m.lowDays||0)||hasPrescriptionAlert(m)}
-function statusFor(m){let d=getDays(m);if(d<=m.lowDays)return {label:d<=1?'Acabando':'Estoque baixo',cls:'critical'};if(hasPrescriptionAlert(m))return {label:'Pedir receita',cls:'warn'};return {label:'Em dia',cls:''}}
+function statusFor(m){
+  let d=getDays(m);
+  if(getRemaining(m)<=0)return {label:'Acabou',cls:'critical'};
+  if(d<=m.lowDays)return {label:d<=1?'Acabando':'Estoque baixo',cls:'critical'};
+  if(hasPrescriptionAlert(m))return {label:'Pedir receita',cls:'warn'};
+  return {label:'Em dia',cls:''}
+}
 function dateLong(d=new Date()){return new Intl.DateTimeFormat('pt-BR',{weekday:'long',day:'numeric',month:'long'}).format(d)}
 function userDisplayName(){const meta=state.user?.user_metadata||{};const full=(meta.full_name||meta.name||'').trim();return full.split(/\s+/)[0]||state.user?.email?.split('@')[0]||'Minha conta'}
 function activeList(){return state.lists.find(x=>x.id===state.activeListId)||state.lists[0]||null}
